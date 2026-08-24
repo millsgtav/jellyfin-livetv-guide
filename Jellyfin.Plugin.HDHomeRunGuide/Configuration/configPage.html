@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <title>HDHomeRun Live TV Guide</title>
+</head>
+<body>
+<div id="HDHomeRunGuideConfigPage" data-role="page" class="page type-interior pluginConfigurationPage"
+     data-require="emby-input,emby-button,emby-checkbox">
+    <div data-role="content">
+        <div class="content-primary">
+            <form id="HDHomeRunGuideConfigForm">
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="BaseUrl" label="Guide API URL" required />
+                    <div class="fieldDescription">Default: https://api.hdhomerun.com/api/xmltv</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="email" id="Email" label="SiliconDust account email" required />
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="DeviceIds" label="Device IDs" required />
+                    <div class="fieldDescription">Comma separated, e.g. 1234ABCD</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="OutputPath" label="Output folder" required />
+                    <div class="fieldDescription">Folder the guide file is written to, e.g. \\server\share\LiveTV</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="text" id="FileName" label="File name" required />
+                    <div class="fieldDescription">Default: guide.xml</div>
+                </div>
+                <div class="inputContainer">
+                    <input is="emby-input" type="number" id="RefreshIntervalHours" label="Refresh interval (hours)" min="1" max="168" required />
+                    <div class="fieldDescription">Applied to the "Download HDHomeRun guide" scheduled task the next time triggers are reset.</div>
+                </div>
+                <br />
+                <button is="emby-button" type="submit" class="raised button-submit block">
+                    <span>Save</span>
+                </button>
+                <button is="emby-button" type="button" id="DownloadNow" class="raised block">
+                    <span>Save and download now</span>
+                </button>
+            </form>
+        </div>
+    </div>
+
+    <script type="text/javascript">
+        (function () {
+            var pluginId = '9f8b1c3a-2d47-4e6b-9a51-7c2e0d4f8b13';
+
+            function load(page, config) {
+                page.querySelector('#BaseUrl').value = config.BaseUrl || '';
+                page.querySelector('#Email').value = config.Email || '';
+                page.querySelector('#DeviceIds').value = config.DeviceIds || '';
+                page.querySelector('#OutputPath').value = config.OutputPath || '';
+                page.querySelector('#FileName').value = config.FileName || 'guide.xml';
+                page.querySelector('#RefreshIntervalHours').value = config.RefreshIntervalHours || 12;
+            }
+
+            function save(page) {
+                return ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    config.BaseUrl = page.querySelector('#BaseUrl').value;
+                    config.Email = page.querySelector('#Email').value;
+                    config.DeviceIds = page.querySelector('#DeviceIds').value;
+                    config.OutputPath = page.querySelector('#OutputPath').value;
+                    config.FileName = page.querySelector('#FileName').value;
+                    config.RefreshIntervalHours = parseInt(page.querySelector('#RefreshIntervalHours').value, 10);
+                    return ApiClient.updatePluginConfiguration(pluginId, config);
+                });
+            }
+
+            document.querySelector('#HDHomeRunGuideConfigPage').addEventListener('pageshow', function () {
+                var page = this;
+                Dashboard.showLoadingMsg();
+                ApiClient.getPluginConfiguration(pluginId).then(function (config) {
+                    load(page, config);
+                    Dashboard.hideLoadingMsg();
+                });
+            });
+
+            document.querySelector('#HDHomeRunGuideConfigForm').addEventListener('submit', function (e) {
+                e.preventDefault();
+                var page = document.querySelector('#HDHomeRunGuideConfigPage');
+                Dashboard.showLoadingMsg();
+                save(page).then(Dashboard.processPluginConfigurationUpdateResult);
+                return false;
+            });
+
+            document.querySelector('#DownloadNow').addEventListener('click', function () {
+                var page = document.querySelector('#HDHomeRunGuideConfigPage');
+                Dashboard.showLoadingMsg();
+                save(page).then(function () {
+                    return ApiClient.ajax({
+                        type: 'POST',
+                        url: ApiClient.getUrl('HDHomeRunGuide/Refresh'),
+                        dataType: 'json'
+                    });
+                }).then(function (result) {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Guide saved to ' + result.Message);
+                }, function () {
+                    Dashboard.hideLoadingMsg();
+                    Dashboard.alert('Download failed. Check the Jellyfin logs for details.');
+                });
+            });
+        })();
+    </script>
+</div>
+</body>
+</html>
