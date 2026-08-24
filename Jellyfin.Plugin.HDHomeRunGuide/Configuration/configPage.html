@@ -98,9 +98,15 @@
                 }).then(function (result) {
                     Dashboard.hideLoadingMsg();
                     Dashboard.alert('Guide saved to ' + result.Message);
-                }, function () {
+                }, function (err) {
                     Dashboard.hideLoadingMsg();
-                    Dashboard.alert('Download failed. Check the Jellyfin logs for details.');
+                    // err is the failed fetch Response; its body carries the real reason.
+                    Promise.resolve(err && typeof err.json === 'function' ? err.json() : null)
+                        .catch(function () { return null; })
+                        .then(function (body) {
+                            var message = body && (body.Message || body.message);
+                            Dashboard.alert('Download failed: ' + (message || 'check the Jellyfin logs for details.'));
+                        });
                 });
             });
         })();

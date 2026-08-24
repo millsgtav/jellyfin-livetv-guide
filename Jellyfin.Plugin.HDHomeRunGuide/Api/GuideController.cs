@@ -5,6 +5,7 @@ using System.Threading.Tasks;
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.Extensions.Logging;
 
 namespace Jellyfin.Plugin.HDHomeRunGuide.Api;
 
@@ -15,10 +16,12 @@ namespace Jellyfin.Plugin.HDHomeRunGuide.Api;
 public class GuideController : ControllerBase
 {
     private readonly GuideDownloader _downloader;
+    private readonly ILogger<GuideController> _logger;
 
-    public GuideController(GuideDownloader downloader)
+    public GuideController(GuideDownloader downloader, ILogger<GuideController> logger)
     {
         _downloader = downloader;
+        _logger = logger;
     }
 
     /// <summary>Downloads the guide immediately using the saved configuration.</summary>
@@ -32,8 +35,9 @@ public class GuideController : ControllerBase
             var path = await _downloader.DownloadAsync(cancellationToken).ConfigureAwait(false);
             return Ok(new RefreshResult(true, path));
         }
-        catch (Exception ex) when (ex is InvalidOperationException or System.Net.Http.HttpRequestException or System.IO.IOException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is InvalidOperationException or System.Net.Http.HttpRequestException or System.IO.IOException or UnauthorizedAccessException or ArgumentException or NotSupportedException)
         {
+            _logger.LogError(ex, "Guide download failed");
             return BadRequest(new RefreshResult(false, ex.Message));
         }
     }

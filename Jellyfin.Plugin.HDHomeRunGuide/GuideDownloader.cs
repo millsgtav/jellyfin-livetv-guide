@@ -55,33 +55,50 @@ public class GuideDownloader
         var url = $"{baseUri.GetLeftPart(UriPartial.Path)}?Email={Uri.EscapeDataString(config.Email.Trim())}&DeviceIDs={Uri.EscapeDataString(config.DeviceIds.Trim())}";
 
         var directory = Path.GetFullPath(config.OutputPath.Trim());
-        Directory.CreateDirectory(directory);
+        try
+        {
+            Directory.CreateDirectory(directory);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException or ArgumentException)
+        {
+            throw new InvalidOperationException($"Cannot access output folder '{directory}': {ex.Message}", ex);
+        }
+
         var destination = Path.Combine(directory, fileName);
 
         // Device IDs and email are omitted from logs so shared log files stay safe.
         _logger.LogInformation("Downloading HDHomeRun guide");
 
         var httpClient = _httpClientFactory.CreateClient(NamedClient.Default);
+        httpClient.Timeout = TimeSpan.FromMinutes(10); // the guide can be tens of megabytes
         using var response = await httpClient.GetAsync(url, HttpCompletionOption.ResponseHeadersRead, cancellationToken).ConfigureAwait(false);
         response.EnsureSuccessStatusCode();
 
         // Write to a temp file first so a failed download never truncates a working guide.
         var tempFile = destination + ".tmp";
         long written;
-        await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
-        await using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
+        try
         {
-            await stream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
-            written = fileStream.Length;
+            await using (var stream = await response.Content.ReadAsStreamAsync(cancellationToken).ConfigureAwait(false))
+            await using (var fileStream = new FileStream(tempFile, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                await stream.CopyToAsync(fileStream, cancellationToken).ConfigureAwait(false);
+                written = fileStream.Length;
+            }
+
+            if (written == 0)
+            {
+                File.Delete(tempFile);
+                throw new InvalidOperationException("The guide response was empty; the existing file was left untouched.");
+            }
+
+            File.Move(tempFile, destination, overwrite: true);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            throw new InvalidOperationException($"Cannot write to '{destination}': {ex.Message}", ex);
         }
 
-        if (written == 0)
-        {
-            File.Delete(tempFile);
-            throw new InvalidOperationException("The guide response was empty; the existing file was left untouched.");
-        }
-
-        File.Move(tempFile, destination, overwrite: true);
         _logger.LogInformation("Saved {Bytes} bytes to {Path}", written, destination);
 
         return destination;
