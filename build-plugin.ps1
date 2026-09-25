@@ -53,7 +53,9 @@ $plugin = $manifest[0]
 # Newest version must be first in the list.
 $plugin.versions = @($entry) + @($plugin.versions | Where-Object { $_.version -ne $Version })
 
-ConvertTo-Json -InputObject @($plugin) -Depth 10 | Set-Content $manifestPath -Encoding UTF8
+# Must be BOM-less: Jellyfin's JSON parser rejects a manifest that starts with a BOM.
+$json = ConvertTo-Json -InputObject @($plugin) -Depth 10
+[System.IO.File]::WriteAllText($manifestPath, $json, (New-Object System.Text.UTF8Encoding $false))
 
 Write-Host ''
 Write-Host "Package : $zipPath"
