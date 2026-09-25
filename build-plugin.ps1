@@ -9,7 +9,7 @@
 param(
     [string]$Version = '1.0.0.0',
     [string]$Changelog = 'Initial release.',
-    [string]$TargetAbi = '10.10.0.0',
+    [string]$TargetAbi = '12.0.0.0',
     [string]$Repo = 'millsgtav/jellyfin-livetv-guide'
 )
 

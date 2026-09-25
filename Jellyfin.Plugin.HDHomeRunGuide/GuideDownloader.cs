@@ -3,6 +3,7 @@ using System.IO;
 using System.Net.Http;
 using System.Threading;
 using System.Threading.Tasks;
+using System.Xml;
 using MediaBrowser.Common.Net;
 using Microsoft.Extensions.Logging;
 
@@ -92,6 +93,14 @@ public class GuideDownloader
                 throw new InvalidOperationException("The guide response was empty; the existing file was left untouched.");
             }
 
+            // A truncated or non-XMLTV response would corrupt Live TV data, so never promote one.
+            var validationError = ValidateXmltv(tempFile);
+            if (validationError is not null)
+            {
+                File.Delete(tempFile);
+                throw new InvalidOperationException($"{validationError} The existing file was left untouched.");
+            }
+
             File.Move(tempFile, destination, overwrite: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
@@ -102,5 +111,38 @@ public class GuideDownloader
         _logger.LogInformation("Saved {Bytes} bytes to {Path}", written, destination);
 
         return destination;
+    }
+
+    /// <summary>Returns null when the file is a readable XMLTV document, otherwise a description of the problem.</summary>
+    private static string? ValidateXmltv(string path)
+    {
+        var settings = new XmlReaderSettings
+        {
+            DtdProcessing = DtdProcessing.Prohibit,
+            XmlResolver = null,
+            IgnoreComments = true,
+            IgnoreWhitespace = true,
+            IgnoreProcessingInstructions = true
+        };
+
+        try
+        {
+            using var reader = XmlReader.Create(path, settings);
+            if (!reader.ReadToFollowing("tv"))
+            {
+                return "The downloaded file is not an XMLTV guide (no <tv> element).";
+            }
+
+            // Reading to the end catches a download that was cut short mid-document.
+            while (reader.Read())
+            {
+            }
+        }
+        catch (XmlException ex)
+        {
+            return $"The downloaded guide is not valid XML: {ex.Message}";
+        }
+
+        return null;
     }
 }

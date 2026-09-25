@@ -5,6 +5,16 @@ manual Postman request.
 
 `GET {BaseUrl}?Email={Email}&DeviceIDs={DeviceIds}` → `{OutputPath}\{FileName}`
 
+## Supported server versions
+
+| Plugin | Jellyfin |
+| --- | --- |
+| 2.x | 12.0 and newer (net10.0) |
+| 1.x | 10.10 (net8.0) |
+
+A 1.x build installed on Jellyfin 12 fails to load correctly and takes the
+dashboard and Live TV pages down with it — install 2.x instead.
+
 ## Configurable fields
 
 | Field | Default |
@@ -51,9 +61,9 @@ asset exists, otherwise Jellyfin's download will 404.
 dotnet publish Jellyfin.Plugin.HDHomeRunGuide -c Release
 ```
 
-Copy `Jellyfin.Plugin.HDHomeRunGuide/bin/Release/net8.0/publish/Jellyfin.Plugin.HDHomeRunGuide.dll`
+Copy `Jellyfin.Plugin.HDHomeRunGuide/bin/Release/net10.0/publish/Jellyfin.Plugin.HDHomeRunGuide.dll`
 into a new folder under the Jellyfin plugins directory, e.g.
-`%ProgramData%\Jellyfin\Server\plugins\HDHomeRun Live TV Guide_1.0.0.0\`, then restart Jellyfin.
+`%ProgramData%\Jellyfin\Server\plugins\HDHomeRun Live TV Guide_2.0.0.0\`, then restart Jellyfin.
 
 ## Use
 
